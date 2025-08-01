@@ -3,7 +3,8 @@
 # JavaScript 病毒检测脚本
 # 检查JS文件中的病毒特征
 
-set -e
+# 移除set -e，防止脚本过早终止
+# set -e
 
 # 颜色定义
 RED='\033[0;31m'
@@ -42,73 +43,79 @@ while IFS= read -r site; do
     if [ -z "$site" ]; then
         continue
     fi
-    
+
     echo -e "${YELLOW}检查站点: $site${NC}"
-    
-    # 查找所有JS文件
-    js_files=$(find "$site" -name "*.js" -type f 2>/dev/null || true)
-    
-    if [ -z "$js_files" ]; then
-        echo -e "${GREEN}未找到JS文件${NC}"
+
+    # 分别查找所有JS文件和template目录中的HTML文件
+    js_files=$(find "$site" -name "*.js" -type f 2>/dev/null || echo "")
+    html_files=$(find "$site" -path "*/template/*.html" -type f 2>/dev/null || echo "")
+
+    # 合并文件列表
+    all_files=$(echo -e "$js_files\n$html_files" | grep -v '^$' || echo "")
+
+    if [ -z "$all_files" ]; then
+        echo -e "${GREEN}未找到JS文件或template下的HTML文件${NC}"
         echo ""
         continue
     fi
-    
+
     suspicious_files=0
-    
-    # 检查每个JS文件
-    while IFS= read -r js_file; do
-        if [ -z "$js_file" ]; then
+
+    # 使用更可靠的方式遍历文件列表
+    echo "$all_files" | while read -r file; do
+        if [ -z "$file" ] || [ ! -f "$file" ]; then
             continue
         fi
-        
+
         declare -A pattern_hits
         total_hits=0
-        
+        has_hit=false
+
         # 检查每个病毒特征
         for pattern_name in "${!virus_patterns[@]}"; do
             pattern="${virus_patterns[$pattern_name]}"
-            
-            # 使用grep检查模式，忽略错误
+
             if [[ "$pattern_name" == "hex_string" ]]; then
-                # 对于十六进制字符串，使用特殊检查（简化版）
-                hits=$(grep -o '\\\x[0-9a-fA-F][0-9a-fA-F]' "$js_file" 2>/dev/null | wc -l || echo "0")
+                hits=$(grep -o '\\\x[0-9a-fA-F][0-9a-fA-F]' "$file" 2>/dev/null | wc -l || echo "0")
             else
-                hits=$(grep -c "$pattern" "$js_file" 2>/dev/null || echo "0")
+                hits=$(grep -c "$pattern" "$file" 2>/dev/null || echo "0")
             fi
-            # 修复：去除换行符和回车符，保证hits为纯数字
             hits=$(echo "$hits" | tr -d '\n' | tr -d '\r')
 
+            # 保存所有命中结果，无论是否为0
+            pattern_hits["$pattern_name"]=$hits
+
             if [ "$hits" -gt 0 ]; then
-                pattern_hits["$pattern_name"]=$hits
+                has_hit=true
                 ((total_hits += hits))
             fi
         done
-        
-        # 如果发现可疑特征，输出报告
-        if [ $total_hits -gt 0 ]; then
+
+        # 任一条件命中就输出
+        if [ "$has_hit" = true ]; then
             echo ""
-            echo -e "${RED}可疑文件: $js_file${NC}"
-            
-            for pattern_name in "${!pattern_hits[@]}"; do
-                hits=${pattern_hits[$pattern_name]}
+            echo -e "${RED}可疑文件: $file${NC}"
+            for pattern_name in "${!virus_patterns[@]}"; do
+                hits=${pattern_hits["$pattern_name"]}
+                if [ -z "$hits" ]; then
+                    hits=0
+                fi
                 echo -e "${YELLOW}  可疑特征 $pattern_name: $hits 次${NC}"
             done
-            
             ((suspicious_files++))
         fi
-        
-    done <<< "$js_files"
-    
+
+    done
+
     if [ $suspicious_files -eq 0 ]; then
-        echo -e "${GREEN}未发现可疑JS文件${NC}"
+        echo -e "${GREEN}未发现可疑JS/HTML文件${NC}"
     else
         echo ""
-        echo -e "${RED}在该站点发现 $suspicious_files 个可疑JS文件${NC}"
+        echo -e "${RED}在该站点发现 $suspicious_files 个可疑JS/HTML文件${NC}"
     fi
-    
+
     echo ""
-    
+
 done < "$DATA_DIR/site.txt"
 
 echo -e "${GREEN}JavaScript 病毒特征检查完成${NC}"
