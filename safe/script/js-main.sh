@@ -17,7 +17,13 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/data"
 
+# 创建日志目录（使用时间戳）
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/log/$TIMESTAMP"
+mkdir -p "$LOG_DIR"
+
 echo -e "${BLUE}[病毒检查] JavaScript 病毒特征检查${NC}"
+echo -e "${BLUE}日志目录: $LOG_DIR${NC}"
 echo ""
 
 # 检查site.txt是否存在
@@ -45,6 +51,16 @@ while IFS= read -r site; do
     fi
 
     echo -e "${YELLOW}检查站点: $site${NC}"
+
+    # 创建站点日志目录
+    site_name=$(basename "$site")
+    SITE_LOG_DIR="$LOG_DIR/$site_name"
+    mkdir -p "$SITE_LOG_DIR"
+
+    # 为每个规则创建空日志文件
+    for pattern_name in "${!virus_patterns[@]}"; do
+        : > "$SITE_LOG_DIR/${pattern_name}.txt"
+    done
 
     # 分别查找所有JS文件和template目录中的HTML文件
     js_files=$(find "$site" -name "*.js" -type f 2>/dev/null || echo "")
@@ -85,9 +101,13 @@ while IFS= read -r site; do
             # 保存所有命中结果，无论是否为0
             pattern_hits["$pattern_name"]=$hits
 
+            # 如果命中次数大于0，记录到对应规则的日志文件
             if [ "$hits" -gt 0 ]; then
                 has_hit=true
                 ((total_hits += hits))
+
+                # 将命中的文件和次数写入对应规则的日志文件（格式：次数 文件名）
+                echo "$hits $(basename "$file"): $file" >> "$SITE_LOG_DIR/${pattern_name}.txt"
             fi
         done
 
@@ -107,6 +127,17 @@ while IFS= read -r site; do
 
     done
 
+    # 对每个规则日志文件进行排序（按数字倒序）
+    for pattern_name in "${!virus_patterns[@]}"; do
+        if [ -s "$SITE_LOG_DIR/${pattern_name}.txt" ]; then
+            # 排序文件内容（按数字倒序）
+            sort -nr "$SITE_LOG_DIR/${pattern_name}.txt" -o "$SITE_LOG_DIR/${pattern_name}.txt"
+        else
+            # 如果文件为空，则删除
+            rm "$SITE_LOG_DIR/${pattern_name}.txt"
+        fi
+    done
+
     if [ $suspicious_files -eq 0 ]; then
         echo -e "${GREEN}未发现可疑JS/HTML文件${NC}"
     else
@@ -119,3 +150,4 @@ while IFS= read -r site; do
 done < "$DATA_DIR/site.txt"
 
 echo -e "${GREEN}JavaScript 病毒特征检查完成${NC}"
+echo -e "${GREEN}日志已保存到: $LOG_DIR${NC}"
