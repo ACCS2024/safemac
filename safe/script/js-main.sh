@@ -76,7 +76,9 @@ while IFS= read -r site; do
             else
                 hits=$(grep -c "$pattern" "$js_file" 2>/dev/null || echo "0")
             fi
-            
+            # 修复：去除换行符和回车符，保证hits为纯数字
+            hits=$(echo "$hits" | tr -d '\n' | tr -d '\r')
+
             if [ "$hits" -gt 0 ]; then
                 pattern_hits["$pattern_name"]=$hits
                 ((total_hits += hits))
