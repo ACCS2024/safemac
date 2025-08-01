@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # MacCMS 网站写入锁定/解锁脚本
-# 锁定MacCMS常见目录，但不锁定缓存和上传目录
+# 使用 chattr +i 设置文件不可更改属性，防止黑产篡改
 
 set -e
 
@@ -16,20 +16,27 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$(dirname "$SCRIPT_DIR")/data"
 
-# 需要锁定的目录（相对路径）
+# 检查是否支持chattr命令
+if ! command -v chattr &> /dev/null; then
+    echo -e "${RED}错误: 当前系统不支持 chattr 命令${NC}"
+    exit 1
+fi
+
+# 需要保护的核心目录（相对路径）
 LOCK_DIRS=(
     "application"
     "thinkphp"
     "template"
-    "public"
+    "public/static/js"
+    "public/static/css"
     "extend"
+    "static"
     "vendor"
 )
 
-# 需要锁定的文件
+# 需要保护的核心文件
 LOCK_FILES=(
     "api.php"
-    "install.php"
     "index.php"
     "*.php"
 )
@@ -47,8 +54,8 @@ EXCLUDE_DIRS=(
 
 usage() {
     echo "用法: $0 [lock|unlock]"
-    echo "  lock   - 锁定网站写入权限"
-    echo "  unlock - 解锁网站写入权限"
+    echo "  lock   - 锁定网站核心文件（使用chattr +i）"
+    echo "  unlock - 解锁网站核心文件（使用chattr -i）"
     exit 1
 }
 
@@ -63,7 +70,7 @@ if [ "$ACTION" != "lock" ] && [ "$ACTION" != "unlock" ]; then
     usage
 fi
 
-echo -e "${BLUE}MacCMS 网站权限管理${NC}"
+echo -e "${BLUE}MacCMS 网站核心文件保护${NC}"
 echo ""
 
 # 检查site.txt是否存在
@@ -128,36 +135,39 @@ for site in "${selected_sites[@]}"; do
     echo -e "${YELLOW}处理站点: $site${NC}"
     
     if [ "$ACTION" = "lock" ]; then
-        echo -e "${YELLOW}  正在锁定写入权限...${NC}"
-        
-        # 锁定指定目录
+        echo -e "${YELLOW}  正在锁定核心文件（chattr +i）...${NC}"
+
+        # ���定指定目录中的PHP文件
         for dir in "${LOCK_DIRS[@]}"; do
             target_dir="$site/$dir"
             if [ -d "$target_dir" ]; then
-                chmod -R a-w "$target_dir" 2>/dev/null || echo -e "${RED}    无法锁定: $target_dir${NC}"
-                echo -e "${GREEN}    已锁定: $dir${NC}"
+                # 查找并锁定PHP文件
+                find "$target_dir" -type f \( -name "*.php" -o -name "*.js" -o -name "*.html" -o -name "*.htm" \) -exec chattr +i {} \; 2>/dev/null || echo -e "${RED}    无法锁定: $target_dir 中的文件${NC}"
+                echo -e "${GREEN}    已锁定: $dir 目录中的核心文件${NC}"
             fi
         done
         
         # 锁定根目录的重要文件
         for file_pattern in "${LOCK_FILES[@]}"; do
-            find "$site" -maxdepth 1 -name "$file_pattern" -type f -exec chmod a-w {} \; 2>/dev/null
+            find "$site" -maxdepth 1 -name "$file_pattern" -type f -exec chattr +i {} \; 2>/dev/null || true
+            echo -e "${GREEN}    已锁定: ��目录 $file_pattern 文件${NC}"
         done
         
-        # 确保排除目录保持可写
+        # 确保排除目录内的文件不被锁定
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
             target_dir="$site/$exclude_dir"
             if [ -d "$target_dir" ]; then
-                chmod -R u+w "$target_dir" 2>/dev/null || true
+                # 解锁可能被误锁的文件
+                find "$target_dir" -type f -exec chattr -i {} \; 2>/dev/null || true
                 echo -e "${BLUE}    保持可写: $exclude_dir${NC}"
             fi
         done
         
     else # unlock
-        echo -e "${YELLOW}  正在解锁写入权限...${NC}"
-        
-        # 解锁所有目录和文件
-        chmod -R u+w "$site" 2>/dev/null || echo -e "${RED}    部分文件解锁失败${NC}"
+        echo -e "${YELLOW}  正在解锁所有文件（chattr -i）...${NC}"
+
+        # 递归解锁所有文件
+        find "$site" -type f -exec chattr -i {} \; 2>/dev/null || echo -e "${RED}    部分文件解锁失败${NC}"
         echo -e "${GREEN}    已解锁所有文件${NC}"
     fi
     
@@ -165,10 +175,10 @@ for site in "${selected_sites[@]}"; do
 done
 
 if [ "$ACTION" = "lock" ]; then
-    echo -e "${GREEN}网站写入权限锁定完成！${NC}"
-    echo -e "${YELLOW}注意: 缓存和上传目录保持可写状态${NC}"
+    echo -e "${GREEN}网站核心文件保护完成！${NC}"
+    echo -e "${YELLOW}注意: 即使root用户也无法修改被锁定的文件，需要先解���才能更新网站${NC}"
 else
-    echo -e "${GREEN}网站写入权限解锁完成！${NC}"
+    echo -e "${GREEN}网站文件解锁完成！${NC}"
 fi
 
 echo ""
