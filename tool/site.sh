@@ -48,6 +48,7 @@ echo ""
 > "$DATA_DIR/site.txt"
 
 found_sites=0
+declare -a found_sites_arr=()
 
 # 检查单个目录是否为MacCMS
 check_maccms() {
@@ -80,19 +81,27 @@ check_maccms() {
 for base_path in "${COMMON_PATHS[@]}"; do
     if [ -d "$base_path" ]; then
         echo -e "${YELLOW}扫描路径: $base_path${NC}"
-        
-        # 列出所有子目录
-        find "$base_path" -maxdepth 1 -type d ! -path "$base_path" 2>/dev/null | while read -r site_dir; do
+        # 递归查找所有包含MACCMS_DIRS目录的站点
+        while IFS= read -r site_dir; do
             if check_maccms "$site_dir"; then
-                echo -e "${GREEN}发现MacCMS站点: $site_dir${NC}"
-                echo "$site_dir" >> "$DATA_DIR/site.txt"
-                ((found_sites++))
+                found_sites_arr+=("$site_dir")
             fi
-        done
+        done < <(find "$base_path" -type d \( $(printf -- '-name %s -o ' "${MACCMS_DIRS[@]}") -false \) -prune -exec dirname {} \; | sort -u)
     else
         echo -e "${YELLOW}路径不存在，跳过: $base_path${NC}"
     fi
 done
+
+# 去重
+found_sites_arr=($(printf "%s\n" "${found_sites_arr[@]}" | sort -u))
+
+# 一次性写入文件
+> "$DATA_DIR/site.txt"
+for site in "${found_sites_arr[@]}"; do
+    echo "$site" >> "$DATA_DIR/site.txt"
+done
+
+found_sites=${#found_sites_arr[@]}
 
 # 读取找到的站点数量
 if [ -f "$DATA_DIR/site.txt" ]; then
