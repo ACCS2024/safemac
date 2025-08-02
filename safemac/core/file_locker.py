@@ -8,6 +8,7 @@ Manages file locking/unlocking using chattr +i/-i attributes
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from ..utils import Colors, print_colored, print_header, confirm_action, get_script_dir, read_site_list
 
@@ -53,7 +54,7 @@ class MacCMSFileLocker:
         """Check if chattr command is available"""
         try:
             # Test chattr with no arguments - shows usage in stderr, exit code 1 is expected
-            result = subprocess.run(['chattr'], capture_output=True)
+            result = subprocess.run(['chattr'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             # chattr shows usage when run without arguments
             return b'Usage:' in result.stderr or b'usage:' in result.stderr
         except FileNotFoundError:
@@ -61,93 +62,18 @@ class MacCMSFileLocker:
         except Exception:
             return False
     
-    def run_chattr(self, operation, path):
-        """Run chattr command on a path"""
+    def execute_shell_command(self, command):
+        """Execute a shell command and return True if successful"""
         try:
-            cmd = ['chattr', operation, str(path)]
-            subprocess.run(cmd, capture_output=True, check=True)
+            # 使用 universal_newlines 而不是 text 参数（Python 3.6.8 兼容）
+            subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True, check=True, shell=True)
             return True
         except subprocess.CalledProcessError:
             return False
-        except Exception:
-            return False
-    
-    def lock_path(self, path):
-        """Lock a file or directory using chattr +i"""
-        return self.run_chattr('+i', path)
-    
-    def unlock_path(self, path):
-        """Unlock a file or directory using chattr -i"""
-        return self.run_chattr('-i', path)
-    
-    def lock_directory_recursive(self, directory):
-        """Recursively lock all files and directories in a path"""
-        dir_path = Path(directory)
-        if not dir_path.exists():
-            return False
-        
-        success_count = 0
-        total_count = 0
-        
-        # Lock the directory itself first
-        if self.lock_path(dir_path):
-            success_count += 1
-        total_count += 1
-        
-        # Recursively lock all files and subdirectories
-        try:
-            for item in dir_path.rglob('*'):
-                total_count += 1
-                if self.lock_path(item):
-                    success_count += 1
         except Exception as e:
-            print_colored(f"    递归锁定时出错: {e}", Colors.RED)
-        
-        return success_count > 0
-    
-    def unlock_directory_recursive(self, directory):
-        """Recursively unlock all files and directories in a path"""
-        dir_path = Path(directory)
-        if not dir_path.exists():
+            print_colored(f"    执行命令出错: {str(e)}", Colors.RED)
             return False
-        
-        success_count = 0
-        total_count = 0
-        
-        try:
-            # Unlock all files and subdirectories first, then the directory
-            for item in dir_path.rglob('*'):
-                total_count += 1
-                if self.unlock_path(item):
-                    success_count += 1
-            
-            # Unlock the directory itself
-            if self.unlock_path(dir_path):
-                success_count += 1
-            total_count += 1
-            
-        except Exception as e:
-            print_colored(f"    递归解锁时出错: {e}", Colors.RED)
-        
-        return success_count > 0
-    
-    def get_php_files_in_root(self, site_path):
-        """Get PHP files in the root directory of a site"""
-        site_dir = Path(site_path)
-        php_files = []
-        
-        try:
-            for pattern in self.lock_files:
-                if pattern == "*.php":
-                    php_files.extend(site_dir.glob("*.php"))
-                else:
-                    file_path = site_dir / pattern
-                    if file_path.exists():
-                        php_files.append(file_path)
-        except Exception:
-            pass
-        
-        return php_files
     
     def lock_site(self, site_path):
         """Lock core files and directories for a MacCMS site"""
@@ -160,28 +86,35 @@ class MacCMSFileLocker:
         print_colored(f"处理站点: {site_path}", Colors.YELLOW)
         print_colored("  正在锁定核心文件和目录（chattr +i）...", Colors.YELLOW)
         
-        # Lock specified directories and their contents
+        # Lock core directories
         for dir_name in self.lock_dirs:
             target_dir = site_dir / dir_name
             if target_dir.exists():
-                if self.lock_directory_recursive(target_dir):
+                cmd = f"find {target_dir} -type f -o -type d | xargs chattr +i 2>/dev/null"
+                if self.execute_shell_command(cmd):
                     print_colored(f"    已锁定: {dir_name} 目录及其所有内容", Colors.GREEN)
                 else:
                     print_colored(f"    锁定失败: {dir_name}", Colors.RED)
         
-        # Lock root PHP files
-        php_files = self.get_php_files_in_root(site_path)
-        for php_file in php_files:
-            if self.lock_path(php_file):
-                print_colored(f"    已锁定: {php_file.name}", Colors.GREEN)
+        # Lock PHP files in root directory
+        for pattern in self.lock_files:
+            if pattern == "*.php":
+                cmd = f"find {site_dir} -maxdepth 1 -name '*.php' | xargs chattr +i 2>/dev/null"
+                self.execute_shell_command(cmd)
+                print_colored(f"    已锁定: 根目录PHP文件", Colors.GREEN)
             else:
-                print_colored(f"    锁定失败: {php_file.name}", Colors.RED)
-        
+                file_path = site_dir / pattern
+                if file_path.exists():
+                    cmd = f"chattr +i {file_path} 2>/dev/null"
+                    if self.execute_shell_command(cmd):
+                        print_colored(f"    已锁定: {pattern}", Colors.GREEN)
+
         # Ensure exclude directories are unlocked
         for exclude_dir in self.exclude_dirs:
             target_dir = site_dir / exclude_dir
             if target_dir.exists():
-                if self.unlock_directory_recursive(target_dir):
+                cmd = f"find {target_dir} -type f -o -type d | xargs chattr -i 2>/dev/null"
+                if self.execute_shell_command(cmd):
                     print_colored(f"    保持可写: {exclude_dir}", Colors.BLUE)
         
         return True
@@ -197,8 +130,9 @@ class MacCMSFileLocker:
         print_colored(f"处理站点: {site_path}", Colors.YELLOW)
         print_colored("  正在解锁所有文件和目录（chattr -i）...", Colors.YELLOW)
         
-        # Recursively unlock all files and directories in the site
-        if self.unlock_directory_recursive(site_dir):
+        # Simple one-line command to recursively unlock all files and directories
+        cmd = f"find {site_dir} -type f -o -type d | xargs chattr -i 2>/dev/null"
+        if self.execute_shell_command(cmd):
             print_colored("    已解锁所有文件和目录", Colors.GREEN)
         else:
             print_colored("    解锁过程中出现一些错误", Colors.YELLOW)
@@ -237,6 +171,22 @@ class MacCMSFileLocker:
             print_colored("\n操作已取消", Colors.YELLOW)
             return []
     
+    def process_sites_in_parallel(self, sites, operation):
+        """Process multiple sites in parallel using threads"""
+        threads = []
+
+        for site in sites:
+            if operation == 'lock':
+                thread = threading.Thread(target=self.lock_site, args=(site,))
+            else:  # unlock
+                thread = threading.Thread(target=self.unlock_site, args=(site,))
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
     def lock_sites(self):
         """Interactive site locking"""
         print_header("MacCMS 网站核心文件保护")
@@ -261,11 +211,9 @@ class MacCMSFileLocker:
             print(f"  {site}")
         print()
         
-        # Lock each selected site
-        for site in selected_sites:
-            self.lock_site(site)
-            print()
-        
+        # Process selected sites in parallel
+        self.process_sites_in_parallel(selected_sites, 'lock')
+
         print_colored("网站核心文件保护完成！", Colors.GREEN)
         print_colored("注意: 即使root用户也无法修改被锁定的文件，需要先解锁才能更新网站", Colors.YELLOW)
         print()
@@ -296,11 +244,9 @@ class MacCMSFileLocker:
             print(f"  {site}")
         print()
         
-        # Unlock each selected site
-        for site in selected_sites:
-            self.unlock_site(site)
-            print()
-        
+        # Process selected sites in parallel
+        self.process_sites_in_parallel(selected_sites, 'unlock')
+
         print_colored("网站文件解锁完成！", Colors.GREEN)
         print()
         
