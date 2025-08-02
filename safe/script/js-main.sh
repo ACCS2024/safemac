@@ -122,6 +122,7 @@ while IFS= read -r site; do
                 fi
                 echo -e "${YELLOW}  可疑特征 $pattern_name: $hits 次${NC}"
             done
+            echo ""
             ((suspicious_files++))
         fi
 
@@ -141,7 +142,6 @@ while IFS= read -r site; do
     if [ $suspicious_files -eq 0 ]; then
         echo -e "${GREEN}未发现可疑JS/HTML文件${NC}"
     else
-        echo ""
         echo -e "${RED}在该站点发现 $suspicious_files 个可疑JS/HTML文件${NC}"
     fi
 
@@ -149,5 +149,6 @@ while IFS= read -r site; do
 
 done < "$DATA_DIR/site.txt"
 
-echo -e "${GREEN}JavaScript 病毒特征检查完成${NC}"
-echo -e "${GREEN}日志已保存到: $LOG_DIR${NC}"
+echo -e "${GREEN}JavaScript病毒检查完成！${NC}"
+echo -e "${BLUE}详细日志已保存到: $LOG_DIR${NC}"
+echo ""

@@ -39,27 +39,61 @@ echo -e "${GREEN}读取到以下站点:${NC}"
 cat "$DATA_DIR/site.txt" | nl -w2 -s'. '
 echo ""
 
-# 病毒检查脚本列表
-VIRUS_SCRIPTS=(
-    "php-active.sh"
-    "php-addones.sh"
-    "js-main.sh"
-)
+# 显示病毒检查菜单
+show_virus_menu() {
+    echo -e "${GREEN}请选择病毒检查类型:${NC}"
+    echo "1. PHP活跃病毒检查 (检查PHP文件中的恶意代码)"
+    echo "2. PHP插件病毒检查 (检查PHP插件和模板中的病毒)"
+    echo "3. JavaScript病毒检查 (检查JS和HTML文件中的可疑代码)"
+    echo "0. 返回上级菜单"
+    echo ""
+    echo -n "请输入选项 [0-3]: "
+}
 
-# 运行所有病毒检查脚本
-for script in "${VIRUS_SCRIPTS[@]}"; do
-    script_path="$SCRIPT_DIR_VIRUS/$script"
-    
+# 执行指定的病毒检查脚本
+run_virus_script() {
+    local script_name="$1"
+    local script_path="$SCRIPT_DIR_VIRUS/$script_name"
+
     if [ -f "$script_path" ]; then
-        echo -e "${YELLOW}运行检查脚本: $script${NC}"
+        echo -e "${YELLOW}开始执行: $script_name${NC}"
+        echo ""
         chmod +x "$script_path"
         bash "$script_path"
         echo ""
+        echo -e "${GREEN}$script_name 执行完成！${NC}"
+        echo ""
+        echo -n "按回车键继续..."
+        read
     else
-        echo -e "${RED}警告: 病毒检查脚本不存在: $script_path${NC}"
+        echo -e "${RED}错误: 病毒检查脚本不存在: $script_path${NC}"
         echo ""
     fi
-done
+}
 
-echo -e "${GREEN}所有病毒检查脚本执行完成！${NC}"
-echo ""
+# 病毒检查菜单循环
+while true; do
+    show_virus_menu
+    read -r choice
+    echo ""
+
+    case $choice in
+        1)
+            run_virus_script "php-active.sh"
+            ;;
+        2)
+            run_virus_script "php-addones.sh"
+            ;;
+        3)
+            run_virus_script "js-main.sh"
+            ;;
+        0)
+            echo -e "${GREEN}返回主菜单${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}无效选项，请重新选择。${NC}"
+            echo ""
+            ;;
+    esac
+done
