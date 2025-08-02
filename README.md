@@ -38,6 +38,7 @@ safemac/
 
 ```bash
 # 克隆仓库
+rm -rf  safemac  # 清理旧版本
 git clone https://github.com/ACCS2024/safemac.git
 cd safemac
 ```
