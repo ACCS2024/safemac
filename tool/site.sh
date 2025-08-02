@@ -25,6 +25,7 @@ COMMON_PATHS=(
     "/www/wwwroot"
     "/home/wwwroot"
     "/home/www"
+    "/home"
 )
 
 # MacCMS特征目录

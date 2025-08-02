@@ -38,11 +38,9 @@ return array (
   ),
 );'
 
-# 让 read 从终端读取用户输入
-exec < /dev/tty
-
 # 遍历每个站点
 while IFS= read -r site; do
+
     if [ -z "$site" ]; then
         continue
     fi

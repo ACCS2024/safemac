@@ -44,6 +44,9 @@ cd safemac
 
 # 给脚本添加执行权限
 chmod +x main.sh
+chmod +x tool/site.sh
+chmod +x safe/*.sh
+chmod +x safe/script/*.sh
 ```
 
 ### 2. 运行系统
@@ -163,7 +166,7 @@ COMMON_PATHS=(
     "/www/wwwroot"
     "/home/wwwroot"
     "/home/www"
-    "/your/custom/path"  # 添加自定义路径
+    "/home/"  # 添加自定义路径
 )
 ```
 

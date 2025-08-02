@@ -46,7 +46,7 @@ while IFS= read -r site; do
         found_virus=true
         
         echo -n "是否将此文件移动到安全位置？(y/N): "
-        read -r confirm
+        read -r confirm < /dev/tty
         if [[ $confirm =~ ^[Yy]$ ]]; then
             backup_file="${active_file%.php}.lock"
             mv "$active_file" "$backup_file"
@@ -63,7 +63,7 @@ while IFS= read -r site; do
         found_virus=true
         
         echo -n "是否将此文件移动到安全位置？(y/N): "
-        read -r confirm
+        read -r confirm < /dev/tty
         if [[ $confirm =~ ^[Yy]$ ]]; then
             backup_file="${system_file%.php}.lock"
             mv "$system_file" "$backup_file"
