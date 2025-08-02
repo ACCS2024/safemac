@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from utils import Colors, print_colored, print_header, confirm_action, get_script_dir, read_site_list
+from ..utils import Colors, print_colored, print_header, confirm_action, get_script_dir, read_site_list
 
 
 class MacCMSFileLocker:
