@@ -90,7 +90,7 @@ cat "$DATA_DIR/site.txt" | nl -w2 -s'. '
 echo ""
 
 echo -n "请选择要操作的站点 (输入数字，多个用空格分隔，或输入 'all' 选择全部): "
-read -r selection
+read -r selection < /dev/tty
 
 # 获取选中的站点
 selected_sites=()

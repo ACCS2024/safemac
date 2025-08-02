@@ -74,7 +74,7 @@ while true; do
             echo -e "${YELLOW}如果想打断运行，请按下 Ctrl+C${NC}"
             echo ""
             echo -n "确认继续吗？(y/N): "
-            read -r confirm
+            read -r confirm < /dev/tty
             if [[ $confirm =~ ^[Yy]$ ]]; then
                 echo -e "${YELLOW}开始运行病毒检查...${NC}"
                 if [ -f "$SAFE_DIR/main.sh" ]; then
