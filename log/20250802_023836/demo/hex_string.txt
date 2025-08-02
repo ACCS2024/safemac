@@ -1,0 +1,1 @@
+12 jquery-1.12.4.min.js: /home/runner/work/safemac/safemac/demo/static/js/jquery-1.12.4.min.js

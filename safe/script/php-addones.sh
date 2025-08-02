@@ -3,7 +3,7 @@
 # PHP Addons 劫持检测脚本
 # 检查 application/extra/addons.php 文件是否被劫持
 
-set -e
+# set -e  # 移除此行，防止脚本过早退出
 
 # 颜色定义
 RED='\033[0;31m'
@@ -49,34 +49,43 @@ while IFS= read -r site; do
     
     # 检查的文件路径
     addons_file="$site/application/extra/addons.php"
+    addones_file="$site/application/extra/addones.php"  # 病毒样本文件名
     
+    # 检查两种可能的文件名
+    target_file=""
     if [ -f "$addons_file" ]; then
+        target_file="$addons_file"
+    elif [ -f "$addones_file" ]; then
+        target_file="$addones_file"
+    fi
+    
+    if [ -n "$target_file" ]; then
         # 检查文件内容是否包含ThinkPHP（可能的劫持特征）
-        if grep -q "ThinkPHP" "$addons_file" 2>/dev/null; then
+        if grep -q "ThinkPHP" "$target_file" 2>/dev/null; then
             echo -e "${RED}命中病毒规则: addons劫持${NC}"
-            echo -e "${RED}发现可疑文件: $addons_file${NC}"
+            echo -e "${RED}发现可疑文件: $target_file${NC}"
             echo ""
             
             echo -e "${YELLOW}注意: 如果覆盖，会导致插件被禁用，安装插件的用户勿用。${NC}"
             echo -n "是否用干净文件覆盖？(y/N): "
-            read -r confirm < /dev/tty
+            read -r confirm
 
             if [[ $confirm =~ ^[Yy]$ ]]; then
                 # 备份原文件
-                backup_file="${addons_file%.php}.lock"
-                cp "$addons_file" "$backup_file"
+                backup_file="${target_file%.php}.lock"
+                cp "$target_file" "$backup_file"
                 echo -e "${GREEN}原文件已备份到: $backup_file${NC}"
                 
                 # 写入干净内容
-                echo "$clean_addons_content" > "$addons_file"
+                echo "$clean_addons_content" > "$target_file"
                 echo -e "${GREEN}已用干净文件覆盖${NC}"
-                echo -e "${YELLOW}如果出现问题，可以删除文件 $addons_file，然后将 $backup_file 重命名为 $addons_file 还原${NC}"
+                echo -e "${YELLOW}如果出现问题，可以删除文件 $target_file，然后将 $backup_file 重命名为 $target_file 还原${NC}"
             fi
         else
             echo -e "${GREEN}addons.php 文件正常${NC}"
         fi
     else
-        echo -e "${YELLOW}未找到 addons.php 文件${NC}"
+        echo -e "${YELLOW}未找到 addons.php 或 addones.php 文件${NC}"
     fi
     
     echo ""
