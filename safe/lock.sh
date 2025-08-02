@@ -70,7 +70,7 @@ if [ "$ACTION" != "lock" ] && [ "$ACTION" != "unlock" ]; then
     usage
 fi
 
-echo -e "${BLUE}MacCMS 网站���心文件保护${NC}"
+echo -e "${BLUE}MacCMS 网站核心文件保护${NC}"
 echo ""
 
 # 检查site.txt是否存在
