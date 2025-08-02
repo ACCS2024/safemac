@@ -9,27 +9,64 @@ MacCMS 文件检查系统是一个简单、安全、用户友好的工具，专�
 - ✅ **自动站点发现**: 扫描常见web服务器路径，自动发现MacCMS安装
 - ✅ **多种病毒检测**: 检测PHP和JavaScript中的常见病毒特征
 - ✅ **安全隔离**: 发现病毒文件时安全移动到隔离区域
-- ✅ **文件保护**: 锁定重要文件防止恶意修改
+- ✅ **文件保护**: 锁定重要文件防止恶意修改 (已修复chattr检测问题)
 - ✅ **交互式界面**: 友好的命令行菜单系统
 - ✅ **备份恢复**: 所有操作都有备份，支持安全恢复
 - 🆕 **Python版本**: 纯Python实现，无需shell环境，跨平台兼容
 - 🆕 **开箱即用**: 仅使用Python标准库，无需安装第三方依赖
+- 🆕 **模块化结构**: 清晰的包结构，单一职责，易于维护和扩展
+- 🔧 **Bug修复**: 修复文件锁定功能，现在可在支持chattr的Linux系统正常工作
 
 ## 系统结构
 
 ```
 safemac/
 ├── main.py              # 主程序入口（Python版本）
-├── utils.py             # 通用工具模块
-├── site_scanner.py      # 站点发现模块
-├── virus_checker.py     # 病毒检测模块
-├── file_locker.py       # 文件锁定模块
+├── safemac/             # 主包目录 (NEW - 重构后的模块化结构)
+│   ├── __init__.py      # 包初始化
+│   ├── cli.py           # 命令行界面模块
+│   ├── core/            # 核心功能模块
+│   │   ├── __init__.py
+│   │   ├── scanner.py   # 站点发现模块 (原 site_scanner.py)
+│   │   ├── virus_checker.py # 病毒检测模块
+│   │   └── file_locker.py   # 文件锁定模块 (包含chattr修复)
+│   └── utils/           # 工具模块
+│       ├── __init__.py
+│       ├── colors.py    # 颜色和输出工具
+│       ├── filesystem.py # 文件系统工具
+│       └── interactive.py # 用户交互工具
+├── utils.py             # 向后兼容工具模块 (DEPRECATED)
+├── site_scanner.py      # 向后兼容站点发现模块 (DEPRECATED)
+├── virus_checker.py     # 向后兼容病毒检测模块 (DEPRECATED)
+├── file_locker.py       # 向后兼容文件锁定模块 (DEPRECATED)
 ├── data/                # 数据目录
 │   └── site.txt         # 站点列表文件
 ├── log/                 # 日志目录（自动创建）
 ├── demo/                # 测试数据目录
 ├── README.md            # 本文档
 └── .gitignore           # Git忽略文件
+```
+
+## 重要更新 (v1.1)
+
+🆕 **项目结构重构**: 
+- 采用清晰的包结构，提高代码维护性
+- 单一职责原则：每个模块功能专一
+- 向后兼容：旧的导入方式仍然可用（会显示弃用警告）
+
+🔧 **Bug修复**:
+- 修复了文件锁定功能中的 chattr 检测问题
+- 现在在支持 chattr 的系统上可以正常工作
+
+📦 **新的包结构使用方式**:
+```python
+# 推荐的新方式
+from safemac.core import MacCMSSiteScanner, MacCMSVirusChecker, MacCMSFileLocker
+from safemac.utils import Colors, print_colored, print_header
+
+# 仍支持的旧方式（会显示弃用警告）
+from file_locker import MacCMSFileLocker
+from site_scanner import MacCMSSiteScanner
 ```
 
 ## 安装和使用

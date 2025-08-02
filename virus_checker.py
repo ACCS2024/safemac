@@ -1,18 +1,22 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
-MacCMS Virus Checker
-Comprehensive virus detection for MacCMS installations
-Combines PHP and JavaScript virus detection functionality
+DEPRECATED: This file has been moved to safemac.core.virus_checker
+This is kept for backward compatibility. Please use the new package structure.
 """
 
-import os
-import re
-import sys
-from datetime import datetime
-from pathlib import Path
-from utils import (Colors, print_colored, print_header, confirm_action, 
-                   get_script_dir, read_site_list, ensure_dir_exists, pause_for_user)
+import warnings
+warnings.warn(
+    "virus_checker.py is deprecated. Use 'from safemac.core import MacCMSVirusChecker' instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+from safemac.core.virus_checker import MacCMSVirusChecker
+
+if __name__ == "__main__":
+    from safemac.core.virus_checker import main
+    main()
 
 
 class MacCMSVirusChecker:
