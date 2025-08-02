@@ -8,6 +8,7 @@
 
 # Log files
 *.log
+log/
 
 # OS generated files
 .DS_Store
