@@ -68,7 +68,7 @@ while IFS= read -r site; do
             
             echo -e "${YELLOW}注意: 如果覆盖，会导致插件被禁用，安装插件的用户勿用。${NC}"
             echo -n "是否用干净文件覆盖？(y/N): "
-            read -r confirm
+            read -r confirm < /dev/tty
 
             if [[ $confirm =~ ^[Yy]$ ]]; then
                 # 备份原文件
