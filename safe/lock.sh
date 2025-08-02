@@ -70,7 +70,7 @@ if [ "$ACTION" != "lock" ] && [ "$ACTION" != "unlock" ]; then
     usage
 fi
 
-echo -e "${BLUE}MacCMS 网站核心文件保护${NC}"
+echo -e "${BLUE}MacCMS 网站���心文件保护${NC}"
 echo ""
 
 # 检查site.txt是否存在
@@ -135,40 +135,47 @@ for site in "${selected_sites[@]}"; do
     echo -e "${YELLOW}处理站点: $site${NC}"
     
     if [ "$ACTION" = "lock" ]; then
-        echo -e "${YELLOW}  正在锁定核心文件（chattr +i）...${NC}"
+        echo -e "${YELLOW}  正在锁定核心文件和目录（chattr +i）...${NC}"
 
-        # ���定指定目录中的PHP文件
+        # 锁定指定目录中的所有文件和目录本身
         for dir in "${LOCK_DIRS[@]}"; do
             target_dir="$site/$dir"
             if [ -d "$target_dir" ]; then
-                # 查找并锁定PHP文件
-                find "$target_dir" -type f \( -name "*.php" -o -name "*.js" -o -name "*.html" -o -name "*.htm" \) -exec chattr +i {} \; 2>/dev/null || echo -e "${RED}    无法锁定: $target_dir 中的文件${NC}"
-                echo -e "${GREEN}    已锁定: $dir 目录中的核心文件${NC}"
+                # 先锁定目录本身，防止在目录中添加/删除文件
+                chattr +i "$target_dir" 2>/dev/null || echo -e "${RED}    无法锁定目录: $target_dir${NC}"
+
+                # 递归锁定目录中的所有文件和子目录
+                find "$target_dir" -type f -exec chattr +i {} \; 2>/dev/null || true
+                find "$target_dir" -type d -exec chattr +i {} \; 2>/dev/null || true
+
+                echo -e "${GREEN}    已锁定: $dir 目录及其所有内容${NC}"
             fi
         done
         
         # 锁定根目录的重要文件
         for file_pattern in "${LOCK_FILES[@]}"; do
             find "$site" -maxdepth 1 -name "$file_pattern" -type f -exec chattr +i {} \; 2>/dev/null || true
-            echo -e "${GREEN}    已锁定: ��目录 $file_pattern 文件${NC}"
+            echo -e "${GREEN}    已锁定: 根目录 $file_pattern 文件${NC}"
         done
         
         # 确保排除目录内的文件不被锁定
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
             target_dir="$site/$exclude_dir"
             if [ -d "$target_dir" ]; then
-                # 解锁可能被误锁的文件
+                # 递归解锁目录和文件
+                find "$target_dir" -type d -exec chattr -i {} \; 2>/dev/null || true
                 find "$target_dir" -type f -exec chattr -i {} \; 2>/dev/null || true
                 echo -e "${BLUE}    保持可写: $exclude_dir${NC}"
             fi
         done
         
     else # unlock
-        echo -e "${YELLOW}  正在解锁所有文件（chattr -i）...${NC}"
+        echo -e "${YELLOW}  正在解锁所有文件和目录（chattr -i）...${NC}"
 
-        # 递归解锁所有文件
-        find "$site" -type f -exec chattr -i {} \; 2>/dev/null || echo -e "${RED}    部分文件解锁失败${NC}"
-        echo -e "${GREEN}    已解锁所有文件${NC}"
+        # 递归解锁所有目录和文件
+        find "$site" -type d -exec chattr -i {} \; 2>/dev/null || true
+        find "$site" -type f -exec chattr -i {} \; 2>/dev/null || true
+        echo -e "${GREEN}    已解锁所有文件和目录${NC}"
     fi
     
     echo ""
@@ -176,7 +183,7 @@ done
 
 if [ "$ACTION" = "lock" ]; then
     echo -e "${GREEN}网站核心文件保护完成！${NC}"
-    echo -e "${YELLOW}注意: 即使root用户也无法修改被锁定的文件，需要先解���才能更新网站${NC}"
+    echo -e "${YELLOW}注意: 即使root用户也无法修改被锁定的文件，需要先解锁才能更新网站${NC}"
 else
     echo -e "${GREEN}网站文件解锁完成！${NC}"
 fi
