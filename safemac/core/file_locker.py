@@ -145,32 +145,9 @@ class MacCMSFileLocker:
 # 建议的 nginx 配置 - 用于保护 .well-known 目录
 # 请将以下配置添加到您的 nginx 站点配置文件中
 
-# SSL证书验证相关设置 - 允许访问但拒绝PHP执行
-location ~ /\\.well-known {
-    allow all;
-    
-    # 拒绝PHP文件执行
-    location ~ \\.php$ {
-        deny all;
-        return 403;
-    }
-}
-
-# 或者更严格的配置 - 只允许特定文件类型
-location ~ /\\.well-known {
-    # 只允许访问证书验证相关文件
-    location ~ \\.(txt|json)$ {
-        allow all;
-    }
-    
-    # 拒绝所有其他文件类型(包括PHP)
-    location ~ \\. {
-        deny all;
-        return 403;
-    }
-    
-    # 允许目录访问用于证书验证
-    try_files $uri $uri/ =404;
+#Prohibit putting sensitive files in certificate verification directory
+if ( $uri ~ "^/\\.well-known/.*\\.(php|jsp|py|js|css|lua|ts|go|zip|tar\\.gz|rar|7z|sql|bak)$" ) {
+    return 403;
 }
 """
         return config
@@ -181,7 +158,6 @@ location ~ /\\.well-known {
         print_colored("为了确保 .well-known 目录的安全性，建议在 nginx 配置中添加以下设置:", Colors.YELLOW)
         print()
         print(self.generate_nginx_well_known_config())
-        print_colored("注意: 请根据您的具体需求选择合适的配置方案", Colors.BLUE)
         print()
     
     def unlock_site(self, site_path):
@@ -282,7 +258,7 @@ location ~ /\\.well-known {
         print_colored("网站核心文件保护完成！", Colors.GREEN)
         print_colored("注意: 即使root用户也无法修改被锁定的文件，需要先解锁才能更新网站", Colors.YELLOW)
         
-        # Check if any site has .well-known directory and show nginx advice
+        # Check if any site has .well-known directory and show nginx advice automatically
         has_well_known = False
         for site in selected_sites:
             well_known_path = Path(site) / ".well-known"
@@ -292,14 +268,8 @@ location ~ /\\.well-known {
         
         if has_well_known:
             print()
-            print_colored("检测到站点包含 .well-known 目录，为确保安全，建议配置 nginx:", Colors.YELLOW)
-            print_colored("是否显示 nginx 配置建议? (y/n): ", Colors.GREEN, end="")
-            try:
-                response = input().strip().lower()
-                if response in ['y', 'yes', 'Y', '是']:
-                    self.show_nginx_configuration_advice()
-            except (KeyboardInterrupt, EOFError):
-                print()
+            print_colored("检测到站点包含 .well-known 目录，为确保安全，显示 nginx 配置建议:", Colors.YELLOW)
+            self.show_nginx_configuration_advice()
         
         print()
         
