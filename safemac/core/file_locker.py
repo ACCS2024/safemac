@@ -47,7 +47,8 @@ class MacCMSFileLocker:
             "static/upload",
             "public/upload",
             "public/uploads",
-            "public/static/upload"
+            "public/static/upload",
+            ".well-known"  # SSL certificate verification directory
         ]
     
     def check_chattr_support(self):
@@ -116,8 +117,72 @@ class MacCMSFileLocker:
                 cmd = f"find {target_dir} -type f -o -type d | xargs chattr -i 2>/dev/null"
                 if self.execute_shell_command(cmd):
                     print_colored(f"    保持可写: {exclude_dir}", Colors.BLUE)
+                    
+                    # Special handling for .well-known directory
+                    if exclude_dir == ".well-known":
+                        self._configure_well_known_security(target_dir)
         
         return True
+    
+    def _configure_well_known_security(self, well_known_dir):
+        """Configure security for .well-known directory"""
+        # Check for PHP files in .well-known directory and warn about them
+        php_files = []
+        for root, dirs, files in os.walk(well_known_dir):
+            for file in files:
+                if file.endswith('.php'):
+                    php_files.append(os.path.join(root, file))
+        
+        if php_files:
+            print_colored(f"    警告: 发现 .well-known 目录中有 PHP 文件:", Colors.RED)
+            for php_file in php_files:
+                print_colored(f"      {php_file}", Colors.RED)
+            print_colored(f"    建议: 确保 nginx 配置拒绝执行 .well-known 中的 PHP 文件", Colors.YELLOW)
+    
+    def generate_nginx_well_known_config(self):
+        """Generate nginx configuration for .well-known directory security"""
+        config = """
+# 建议的 nginx 配置 - 用于保护 .well-known 目录
+# 请将以下配置添加到您的 nginx 站点配置文件中
+
+# SSL证书验证相关设置 - 允许访问但拒绝PHP执行
+location ~ /\\.well-known {
+    allow all;
+    
+    # 拒绝PHP文件执行
+    location ~ \\.php$ {
+        deny all;
+        return 403;
+    }
+}
+
+# 或者更严格的配置 - 只允许特定文件类型
+location ~ /\\.well-known {
+    # 只允许访问证书验证相关文件
+    location ~ \\.(txt|json)$ {
+        allow all;
+    }
+    
+    # 拒绝所有其他文件类型(包括PHP)
+    location ~ \\. {
+        deny all;
+        return 403;
+    }
+    
+    # 允许目录访问用于证书验证
+    try_files $uri $uri/ =404;
+}
+"""
+        return config
+    
+    def show_nginx_configuration_advice(self):
+        """Show nginx configuration advice for .well-known security"""
+        print_header("Nginx .well-known 目录安全配置建议")
+        print_colored("为了确保 .well-known 目录的安全性，建议在 nginx 配置中添加以下设置:", Colors.YELLOW)
+        print()
+        print(self.generate_nginx_well_known_config())
+        print_colored("注意: 请根据您的具体需求选择合适的配置方案", Colors.BLUE)
+        print()
     
     def unlock_site(self, site_path):
         """Unlock all files and directories for a MacCMS site"""
@@ -216,6 +281,26 @@ class MacCMSFileLocker:
 
         print_colored("网站核心文件保护完成！", Colors.GREEN)
         print_colored("注意: 即使root用户也无法修改被锁定的文件，需要先解锁才能更新网站", Colors.YELLOW)
+        
+        # Check if any site has .well-known directory and show nginx advice
+        has_well_known = False
+        for site in selected_sites:
+            well_known_path = Path(site) / ".well-known"
+            if well_known_path.exists():
+                has_well_known = True
+                break
+        
+        if has_well_known:
+            print()
+            print_colored("检测到站点包含 .well-known 目录，为确保安全，建议配置 nginx:", Colors.YELLOW)
+            print_colored("是否显示 nginx 配置建议? (y/n): ", Colors.GREEN, end="")
+            try:
+                response = input().strip().lower()
+                if response in ['y', 'yes', 'Y', '是']:
+                    self.show_nginx_configuration_advice()
+            except (KeyboardInterrupt, EOFError):
+                print()
+        
         print()
         
         return True
