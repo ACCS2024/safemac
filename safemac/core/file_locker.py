@@ -145,32 +145,9 @@ class MacCMSFileLocker:
 # 建议的 nginx 配置 - 用于保护 .well-known 目录
 # 请将以下配置添加到您的 nginx 站点配置文件中
 
-# SSL证书验证相关设置 - 允许访问但拒绝PHP执行
-location ~ /\\.well-known {
-    allow all;
-    
-    # 拒绝PHP文件执行
-    location ~ \\.php$ {
-        deny all;
-        return 403;
-    }
-}
-
-# 或者更严格的配置 - 只允许特定文件类型
-location ~ /\\.well-known {
-    # 只允许访问证书验证相关文件
-    location ~ \\.(txt|json)$ {
-        allow all;
-    }
-    
-    # 拒绝所有其他文件类型(包括PHP)
-    location ~ \\. {
-        deny all;
-        return 403;
-    }
-    
-    # 允许目录访问用于证书验证
-    try_files $uri $uri/ =404;
+# 禁止在证书验证目录中访问敏感文件类型
+if ( $uri ~ "^/\\.well-known/.*\\.(php|jsp|py|js|css|lua|ts|go|zip|tar\\.gz|rar|7z|sql|bak)$" ) {
+    return 403;
 }
 """
         return config
@@ -292,14 +269,8 @@ location ~ /\\.well-known {
         
         if has_well_known:
             print()
-            print_colored("检测到站点包含 .well-known 目录，为确保安全，建议配置 nginx:", Colors.YELLOW)
-            print_colored("是否显示 nginx 配置建议? (y/n): ", Colors.GREEN, end="")
-            try:
-                response = input().strip().lower()
-                if response in ['y', 'yes', 'Y', '是']:
-                    self.show_nginx_configuration_advice()
-            except (KeyboardInterrupt, EOFError):
-                print()
+            print_colored("检测到站点包含 .well-known 目录，为确保安全，显示 nginx 配置建议:", Colors.YELLOW)
+            self.show_nginx_configuration_advice()
         
         print()
         
